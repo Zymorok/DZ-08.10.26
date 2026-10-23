@@ -1,5 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
 export const listRooms = query({
@@ -50,11 +50,11 @@ export const deleteRoom = mutation({
   args: { roomId: v.id("chatRooms") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Потрібно увійти в акаунт");
+    if (!userId) throw new ConvexError("Потрібно увійти в акаунт");
     const room = await ctx.db.get(args.roomId);
-    if (!room) throw new Error("Кімнату не знайдено");
+    if (!room) throw new ConvexError("Кімнату не знайдено");
     if (room.creatorId !== userId)
-      throw new Error("Видалити кімнату може лише її автор");
+      throw new ConvexError("Видалити кімнату може лише її автор");
     const messages = await ctx.db
       .query("messages")
       .withIndex("by_chat_room", (q) => q.eq("chatRoomId", args.roomId))

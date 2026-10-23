@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery } from "convex/react";
+import { ConvexError } from "convex/values";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { api } from "@/convex/_generated/api";
 import { COLORS } from "@/constants/theme";
@@ -33,7 +34,7 @@ export default function ChatRoomsScreen() {
       await deleteRoom({ roomId: selectedRoom._id });
       setSelectedRoom(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не вдалося видалити кімнату");
+      setError(err instanceof ConvexError ? String(err.data) : "Не вдалося видалити кімнату");
     } finally {
       setDeleting(false);
     }

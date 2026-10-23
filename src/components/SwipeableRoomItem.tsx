@@ -75,8 +75,12 @@ export function SwipeableRoomItem({ room, isCreator, onPress, onDelete }: {
               if (swiping.get()) return;
               if (translateX.get() !== 0) close(); else onPress();
             }}
-            className="rounded-2xl bg-surface border border-surfaceLight p-4"
+            className="rounded-2xl bg-surface border border-surfaceLight p-4 flex-row items-center"
           >
+            <View className="w-12 h-12 rounded-xl bg-surfaceLight items-center justify-center mr-4">
+              <Ionicons name="chatbubbles" size={22} color={COLORS.primary} />
+            </View>
+            <View className="flex-1">
             <View className="flex-row items-center gap-2">
               <Text className="text-white text-lg font-semibold flex-shrink" numberOfLines={1}>
                 {room.title}
@@ -100,6 +104,7 @@ export function SwipeableRoomItem({ room, isCreator, onPress, onDelete }: {
                 }) : ""}
               </Text>
               <Ionicons name="chevron-forward" size={16} color={COLORS.grey} />
+            </View>
             </View>
           </TouchableOpacity>
         </Animated.View>
