@@ -180,7 +180,7 @@ export default function ChatRoomScreen() {
       const file = Platform.OS === "web" ? await (await fetch(uri)).blob() : new File(uri);
       const response = await fetch(uploadUrl, {
         method: "POST",
-        headers: { "Content-Type": Platform.OS === "web" ? file.type : type === "audio" ? "audio/mp4" : "video/mp4" },
+        headers: { "Content-Type": Platform.OS === "web" ? file.type.split(";")[0] : type === "audio" ? "audio/mp4" : "video/mp4" },
         body: file,
       });
       if (!response.ok) throw new Error("Upload failed");
