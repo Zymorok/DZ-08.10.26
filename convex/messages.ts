@@ -1,5 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { Id } from "./_generated/dataModel";
 import { mutation, MutationCtx, query } from "./_generated/server";
 
@@ -11,7 +12,7 @@ async function updateLastMessage(ctx: MutationCtx, roomId: Id<"chatRooms">) {
     .first();
   await ctx.db.patch(roomId, {
     lastMessage: last
-      ? `${last.senderName}: ${last.imageUrl ? "📷 Фото" + (last.content ? " — " + last.content : "") : last.content}`
+      ? `${last.senderName}: ${last.audioUrl ? "🎤 Голосове повідомлення" : last.videoUrl ? "📹 Відеоповідомлення" : last.imageUrl ? "📷 Фото" + (last.content ? " — " + last.content : "") : last.content}`
       : undefined,
     lastMessageAt: last?._creationTime,
   });
@@ -25,7 +26,7 @@ async function getReply(ctx: MutationCtx, roomId: Id<"chatRooms">, id?: Id<"mess
   return {
     replyToId: message._id,
     replyToSender: message.senderName,
-    replyToText: message.content || "📷 Фотографія",
+    replyToText: message.content || (message.audioUrl ? "🎤 Голосове повідомлення" : message.videoUrl ? "📹 Відеоповідомлення" : "📷 Фотографія"),
   };
 }
 
@@ -44,6 +45,25 @@ export const listMessages = query({
       ...message,
       senderPhoto: (await ctx.db.get(message.senderId))?.image,
     })));
+  },
+});
+
+export const getPaginatedMessages = query({
+  args: { chatRoomId: v.string(), paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    const roomId = ctx.db.normalizeId("chatRooms", args.chatRoomId);
+    if (!(await getAuthUserId(ctx)) || !roomId || !(await ctx.db.get(roomId)))
+      return { page: [], isDone: true, continueCursor: "" };
+    const result = await ctx.db.query("messages")
+      .withIndex("by_chat_room", q => q.eq("chatRoomId", roomId))
+      .order("desc").paginate(args.paginationOpts);
+    return {
+      ...result,
+      page: await Promise.all(result.page.map(async message => ({
+        ...message,
+        senderPhoto: (await ctx.db.get(message.senderId))?.image,
+      }))),
+    };
   },
 });
 
@@ -79,6 +99,8 @@ export const editMessage = mutation({
     const message = await ctx.db.get(args.messageId);
     if (!message || message.senderId !== userId)
       throw new Error("Можна редагувати лише власні повідомлення");
+    if (message.audioUrl || message.videoUrl)
+      throw new ConvexError("Можна редагувати лише текст і підпис до фото");
     const content = args.content.trim();
     if ((!content && !message.imageUrl) || content.length > 2000)
       throw new Error("Перевірте текст повідомлення");
@@ -98,7 +120,11 @@ export const deleteMessage = mutation({
     const message = await ctx.db.get(args.messageId);
     if (!message || message.senderId !== userId)
       throw new Error("Можна видаляти лише власні повідомлення");
-    if (message.storageId) await ctx.storage.delete(message.storageId);
+    for (const fileId of [message.storageId, message.audioStorageId, message.videoStorageId])
+      if (fileId) await ctx.storage.delete(fileId);
+    const reactions = await ctx.db.query("messageReactions")
+      .withIndex("by_message", q => q.eq("messageId", message._id)).collect();
+    for (const reaction of reactions) await ctx.db.delete(reaction._id);
     await ctx.db.delete(message._id);
     await updateLastMessage(ctx, message.chatRoomId);
   },
@@ -152,4 +178,47 @@ export const sendMediaMessage = mutation({
     await updateLastMessage(ctx, args.chatRoomId);
     return id;
   },
+});
+
+async function saveRecording(ctx: MutationCtx, args: {
+  chatRoomId: Id<"chatRooms">;
+  storageId: Id<"_storage">;
+  duration: number;
+  replyToId?: Id<"messages">;
+}, type: "audio" | "video") {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) throw new ConvexError("Потрібно увійти в акаунт");
+  const user = await ctx.db.get(userId);
+  if (!user || !(await ctx.db.get(args.chatRoomId)))
+    throw new ConvexError("Кімнату не знайдено");
+  const file = await ctx.db.system.get(args.storageId);
+  const limit = type === "audio" ? 120 : 60;
+  if (!file || !file.contentType?.startsWith(type + "/") ||
+      file.size > (type === "audio" ? 10 : 25) * 1024 * 1024 ||
+      !Number.isFinite(args.duration) || args.duration <= 0 || args.duration > limit + 1)
+    throw new ConvexError("Перевірте формат, розмір і тривалість запису");
+  const url = await ctx.storage.getUrl(args.storageId);
+  if (!url) throw new ConvexError("Запис не знайдено");
+  const id = await ctx.db.insert("messages", {
+    chatRoomId: args.chatRoomId,
+    senderId: userId,
+    senderName: user.fullname || user.name || user.email || "Користувач",
+    senderPhoto: user.image,
+    ...await getReply(ctx, args.chatRoomId, args.replyToId),
+    ...(type === "audio"
+      ? { audioUrl: url, audioStorageId: args.storageId, audioDuration: args.duration }
+      : { videoUrl: url, videoStorageId: args.storageId, videoDuration: args.duration, isVideoNote: true }),
+  });
+  await updateLastMessage(ctx, args.chatRoomId);
+  return id;
+}
+
+export const sendAudioMessage = mutation({
+  args: { chatRoomId: v.id("chatRooms"), storageId: v.id("_storage"), duration: v.number(), replyToId: v.optional(v.id("messages")) },
+  handler: (ctx, args) => saveRecording(ctx, args, "audio"),
+});
+
+export const sendVideoNoteMessage = mutation({
+  args: { chatRoomId: v.id("chatRooms"), storageId: v.id("_storage"), duration: v.number(), replyToId: v.optional(v.id("messages")) },
+  handler: (ctx, args) => saveRecording(ctx, args, "video"),
 });

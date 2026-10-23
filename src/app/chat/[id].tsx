@@ -10,10 +10,12 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ViewToken,
 } from "react-native";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
+import { ConvexError } from "convex/values";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
@@ -27,6 +29,10 @@ import { TypingDots } from "@/components/TypingDots";
 
 import { SwipeableMessageItem } from "@/components/SwipeableMessageItem";
 import { ReplyPreviewBar } from "@/components/ReplyPreviewBar";
+import { ChatInput } from "@/components/ChatInput";
+import { ReactionPickerModal } from "@/components/ReactionPickerModal";
+
+const viewabilityConfig = { itemVisiblePercentThreshold: 50 };
 
 export default function ChatRoomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -34,11 +40,14 @@ export default function ChatRoomScreen() {
   const insets = useSafeAreaInsets();
   const chatRoomId = id as Id<"chatRooms">;
   const room = useQuery(api.rooms.getRoom, { roomId: id });
-  const messages = useQuery(api.messages.listMessages, { chatRoomId: id });
+  const { results: messages, status, loadMore } = usePaginatedQuery(api.messages.getPaginatedMessages, { chatRoomId: id }, { initialNumItems: 25 });
   const user = useQuery(api.users.currentUser);
   const typingUsers = useQuery(api.typing.getTypingUsers, { chatRoomId: id });
   const sendMessage = useMutation(api.messages.sendMessage);
   const sendMediaMessage = useMutation(api.messages.sendMediaMessage);
+  const sendAudioMessage = useMutation(api.messages.sendAudioMessage);
+  const sendVideoMessage = useMutation(api.messages.sendVideoNoteMessage);
+  const toggleReaction = useMutation(api.reactions.toggleReaction);
   const generateUploadUrl = useMutation(api.messages.generateUploadUrl);
   const editMessage = useMutation(api.messages.editMessage);
   const deleteMessage = useMutation(api.messages.deleteMessage);
@@ -58,6 +67,16 @@ export default function ChatRoomScreen() {
   const listRef = useRef<FlatList<Doc<"messages">>>(null);
   const inputRef = useRef<TextInput>(null);
   const lastTypingSent = useRef(0);
+  const nearBottom = useRef(true);
+  const [visibleMessages, setVisibleMessages] = useState<string[]>([]);
+  const viewability = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    setVisibleMessages(viewableItems.map(item => item.key));
+  }, []);
+  const newestId = messages[0]?._id;
+
+  useEffect(() => {
+    if (nearBottom.current) listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, [newestId]);
 
   useEffect(
     () => () => {
@@ -143,6 +162,7 @@ export default function ChatRoomScreen() {
       setText("");
       stopTyping();
       Keyboard.dismiss();
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
     } catch {
       setError(
         "Не вдалося зберегти повідомлення. Перевірте з’єднання та спробуйте ще раз.",
@@ -150,6 +170,41 @@ export default function ChatRoomScreen() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function sendRecording(uri: string, type: "audio" | "video", duration: number) {
+    setSubmitting(true);
+    setError("");
+    try {
+      const uploadUrl = await generateUploadUrl();
+      const file = Platform.OS === "web" ? await (await fetch(uri)).blob() : new File(uri);
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": Platform.OS === "web" ? file.type : type === "audio" ? "audio/mp4" : "video/mp4" },
+        body: file,
+      });
+      if (!response.ok) throw new Error("Upload failed");
+      const { storageId } = await response.json();
+      const args = { chatRoomId, storageId, duration, replyToId: replyTarget?._id };
+      if (type === "audio") await sendAudioMessage(args);
+      else await sendVideoMessage(args);
+      setReplyTarget(null);
+      stopTyping();
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    } catch (error) {
+      setError(error instanceof ConvexError ? String(error.data) : "Не вдалося надіслати запис. Спробуйте ще раз.");
+      throw error;
+    } finally { setSubmitting(false); }
+  }
+
+  async function react(emoji: string) {
+    if (!actionMessage || submitting) return;
+    setSubmitting(true);
+    try {
+      await toggleReaction({ messageId: actionMessage._id, emoji });
+      setActionMessage(null);
+    } catch { setError("Не вдалося змінити реакцію. Спробуйте ще раз."); }
+    finally { setSubmitting(false); }
   }
 
   function openActions(message: Doc<"messages">) {
@@ -201,7 +256,7 @@ export default function ChatRoomScreen() {
     }
   }
 
-  if (room === undefined || messages === undefined || user === undefined) {
+  if (room === undefined || status === "LoadingFirstPage" || user === undefined) {
     return (
       <View className="flex-1 bg-black justify-center items-center">
         <ActivityIndicator color={COLORS.primary} />
@@ -263,19 +318,28 @@ export default function ChatRoomScreen() {
       <FlatList
         ref={listRef}
         data={messages}
+        inverted
+        initialNumToRender={12}
+        maxToRenderPerBatch={10}
+        windowSize={7}
+        maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
+        onViewableItemsChanged={viewability}
+        viewabilityConfig={viewabilityConfig}
         keyExtractor={(item) => item._id}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ padding: 16 }}
-        onContentSizeChange={(_, height) =>
-          listRef.current?.scrollToOffset({ offset: height, animated: true })
-        }
+        onScroll={event => { nearBottom.current = event.nativeEvent.contentOffset.y < 100; }}
+        scrollEventThrottle={100}
+        onEndReached={() => { if (status === "CanLoadMore") loadMore(25); }}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={status === "LoadingMore" ? <View className="items-center p-3"><ActivityIndicator color={COLORS.primary} /><Text className="text-grey text-xs mt-2">Завантаження історії...</Text></View> : null}
         ListEmptyComponent={
           <Text className="text-grey text-center mt-8">
             Повідомлень ще немає. Напишіть першим.
           </Text>
         }
         renderItem={({ item }) => (
-          <SwipeableMessageItem item={item} own={item.senderId === user?._id}
+          <SwipeableMessageItem item={item} own={item.senderId === user?._id} active={visibleMessages.includes(item._id)}
             onReply={beginReply} onActions={openActions} onImage={setFullscreenImage}
             onAuthor={authorId => router.push({ pathname: '/user/[id]', params: { id: authorId } })} />
         )}
@@ -331,68 +395,7 @@ export default function ChatRoomScreen() {
           {error}
         </Text>
       ) : null}
-      <View className="flex-row items-end gap-2 p-3 border-t border-surfaceLight">
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Обрати фото"
-          onPress={pickImage}
-          disabled={submitting || !!editing}
-          style={{ padding: 10, opacity: editing ? 0.3 : 1 }}
-        >
-          <Ionicons name="image-outline" size={25} color={COLORS.primary} />
-        </TouchableOpacity>
-        <TextInput
-          ref={inputRef}
-          accessibilityLabel="Повідомлення"
-          value={text}
-          onChangeText={changeText}
-          onBlur={stopTyping}
-          maxLength={2000}
-          editable={!submitting}
-          multiline
-          placeholder={
-            editing
-              ? "Змініть текст..."
-              : selectedImage
-                ? "Додайте підпис до фото..."
-                : "Напишіть повідомлення..."
-          }
-          placeholderTextColor={COLORS.grey}
-          className="flex-1 bg-surface border border-surfaceLight rounded-2xl text-white px-4 py-3"
-          style={{ minHeight: 44, maxHeight: 120 }}
-        />
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={editing ? "Зберегти зміни" : "Надіслати"}
-          onPress={send}
-          disabled={
-            submitting || (!text.trim() && !selectedImage && !editing?.imageUrl)
-          }
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: COLORS.primary,
-            alignItems: "center",
-            justifyContent: "center",
-            opacity:
-              submitting ||
-              (!text.trim() && !selectedImage && !editing?.imageUrl)
-                ? 0.4
-                : 1,
-          }}
-        >
-          {submitting ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Ionicons
-              name={editing ? "checkmark" : "send"}
-              size={21}
-              color="white"
-            />
-          )}
-        </TouchableOpacity>
-      </View>
+      <ChatInput text={text} onChangeText={changeText} onBlur={stopTyping} onSend={send} onPickImage={pickImage} onRecording={sendRecording} onError={setError} submitting={submitting} editing={!!editing} hasImage={!!selectedImage} inputRef={inputRef} />
       <Modal
         visible={!!actionMessage}
         transparent
@@ -425,17 +428,18 @@ export default function ChatRoomScreen() {
               </>
             ) : (
               <>
+                <ReactionPickerModal onSelect={react} disabled={submitting} />
                 <TouchableOpacity accessibilityRole="button" onPress={() => actionMessage && beginReply(actionMessage)} className="py-3">
                   <Text className="text-white">Відповісти</Text>
                 </TouchableOpacity>
                 {actionMessage?.senderId === user?._id ? <>
-                <TouchableOpacity
+                {!actionMessage?.audioUrl && !actionMessage?.videoUrl ? <TouchableOpacity
                   accessibilityRole="button"
                   onPress={beginEditing}
                   className="py-3"
                 >
                   <Text className="text-white">Редагувати</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> : null}
                 <TouchableOpacity
                   accessibilityRole="button"
                   onPress={() => setConfirmDelete(true)}

@@ -12,7 +12,7 @@ export function ReplyPreviewBar({ message, onCancel }: {
       <Ionicons name="arrow-undo" size={20} color={COLORS.primary} />
       <View className="flex-1">
         <Text className="text-primary font-semibold text-xs">Відповідь для {message.senderName}</Text>
-        <Text className="text-white text-sm" numberOfLines={1}>{message.content || "📷 Фотографія"}</Text>
+        <Text className="text-white text-sm" numberOfLines={1}>{message.content || (message.audioUrl ? "🎤 Голосове повідомлення" : message.videoUrl ? "📹 Відеоповідомлення" : "📷 Фотографія")}</Text>
       </View>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel="Скасувати відповідь" onPress={onCancel} className="p-2">
         <Ionicons name="close-circle-outline" size={23} color={COLORS.grey} />

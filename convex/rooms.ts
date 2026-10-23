@@ -60,7 +60,11 @@ export const deleteRoom = mutation({
       .withIndex("by_chat_room", (q) => q.eq("chatRoomId", args.roomId))
       .collect();
     for (const message of messages) {
-      if (message.storageId) await ctx.storage.delete(message.storageId);
+      for (const fileId of [message.storageId, message.audioStorageId, message.videoStorageId])
+        if (fileId) await ctx.storage.delete(fileId);
+      const reactions = await ctx.db.query("messageReactions")
+        .withIndex("by_message", q => q.eq("messageId", message._id)).collect();
+      for (const reaction of reactions) await ctx.db.delete(reaction._id);
       await ctx.db.delete(message._id);
     }
     const typing = await ctx.db

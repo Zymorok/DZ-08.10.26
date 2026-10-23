@@ -17,6 +17,7 @@ import type * as likes from "../likes.js";
 import type * as messages from "../messages.js";
 import type * as notifications from "../notifications.js";
 import type * as posts from "../posts.js";
+import type * as reactions from "../reactions.js";
 import type * as rooms from "../rooms.js";
 import type * as stories from "../stories.js";
 import type * as typing from "../typing.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   messages: typeof messages;
   notifications: typeof notifications;
   posts: typeof posts;
+  reactions: typeof reactions;
   rooms: typeof rooms;
   stories: typeof stories;
   typing: typeof typing;

@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "Prostir 06.10",
-    "slug": "prostir-dz0610",
+    "name": "Prostir 08.10",
+    "slug": "prostir-dz0810",
     "owner": "xqzmyy",
-    "version": "1.0.1",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "prostir0610",
+    "scheme": "prostir0810",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.xqzmyy.prostir06.preview"
+      "bundleIdentifier": "com.xqzmyy.prostir08.preview"
     },
     "android": {
       "adaptiveIcon": {
@@ -20,9 +20,14 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.xqzmyy.prostir06.preview",
+      "package": "com.xqzmyy.prostir08.preview",
       "softwareKeyboardLayoutMode": "resize",
-      "versionCode": 1
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "output": "static",
@@ -43,10 +48,27 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Дозвольте Prostir обирати фотографії для повідомлень.",
-          "microphonePermission": false
+          "photosPermission": "Дозвольте Prostir обирати фотографії для повідомлень."
         }
-      ]
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Дозвольте Prostir записувати голосові повідомлення.",
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Дозвольте Prostir записувати відеоповідомлення.",
+          "microphonePermission": "Дозвольте Prostir записувати звук відеоповідомлень.",
+          "recordAudioAndroid": true
+        }
+      ],
+      "expo-video",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -55,7 +77,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "3caeff05-419f-4c65-bde6-cef4e2f133ff"
+        "projectId": "9cd06969-78fb-42e1-8207-e5e51c6a56f0"
       }
     }
   }
