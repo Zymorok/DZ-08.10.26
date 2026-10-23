@@ -52,7 +52,8 @@ export const deleteRoom = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Потрібно увійти в акаунт");
     const room = await ctx.db.get(args.roomId);
-    if (!room || room.creatorId !== userId)
+    if (!room) throw new Error("Кімнату не знайдено");
+    if (room.creatorId !== userId)
       throw new Error("Видалити кімнату може лише її автор");
     const messages = await ctx.db
       .query("messages")
@@ -68,5 +69,6 @@ export const deleteRoom = mutation({
       .collect();
     for (const indicator of typing) await ctx.db.delete(indicator._id);
     await ctx.db.delete(args.roomId);
+    return { success: true };
   },
 });

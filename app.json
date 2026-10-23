@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "Prostir 03.10",
-    "slug": "prostir-dz0310",
+    "name": "Prostir 06.10",
+    "slug": "prostir-dz0610",
     "owner": "xqzmyy",
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "prostir0310",
+    "scheme": "prostir0610",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.xqzmyy.prostir03.preview"
+      "bundleIdentifier": "com.xqzmyy.prostir06.preview"
     },
     "android": {
       "adaptiveIcon": {
@@ -20,9 +20,9 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.xqzmyy.prostir03.preview",
+      "package": "com.xqzmyy.prostir06.preview",
       "softwareKeyboardLayoutMode": "resize",
-      "versionCode": 2
+      "versionCode": 1
     },
     "web": {
       "output": "static",
@@ -55,7 +55,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "cb45dd6f-f4c5-47a3-b913-9ab82b4d689c"
+        "projectId": "3caeff05-419f-4c65-bde6-cef4e2f133ff"
       }
     }
   }

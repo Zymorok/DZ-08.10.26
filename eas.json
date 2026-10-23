@@ -10,7 +10,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_CONVEX_URL": "https://cheery-clownfish-967.convex.cloud"
+        "EXPO_PUBLIC_CONVEX_URL": "https://marvelous-bulldog-369.convex.cloud"
       }
     }
   }
