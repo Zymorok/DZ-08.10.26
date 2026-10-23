@@ -11,6 +11,7 @@ function setVideoMuted(player: VideoPlayer, muted: boolean) {
 }
 
 export function VideoNotePlayer({ url, duration, active }: { url: string; duration: number; active: boolean }) {
+  "use no memo";
   const player = useVideoPlayer(url, video => {
     video.loop = true;
     video.muted = true;
@@ -38,7 +39,7 @@ export function VideoNotePlayer({ url, duration, active }: { url: string; durati
     <View style={{ width: 206, maxWidth: "100%", gap: 4 }}>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel={muted ? "Увімкнути звук відео" : "Вимкнути звук відео"} onPress={toggleSound} style={{ width: 206, height: 206 }}>
         <View style={{ width: 196, height: 196, margin: 5, borderRadius: 98, overflow: "hidden", backgroundColor: COLORS.surfaceLight }}>
-          <VideoView player={player} style={{ width: 196, height: 196 }} nativeControls={false} contentFit="cover" surfaceType="textureView" />
+          <VideoView pointerEvents="none" player={player} style={{ width: 196, height: 196 }} nativeControls={false} contentFit="cover" surfaceType="textureView" />
         </View>
         <Svg width={206} height={206} pointerEvents="none" style={{ position: "absolute" }}>
           <Circle cx={103} cy={103} r={98} stroke={COLORS.grey} strokeWidth={3} fill="none" />
