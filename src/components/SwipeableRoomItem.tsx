@@ -16,6 +16,7 @@ export function SwipeableRoomItem({ room, isCreator, onPress, onDelete }: {
   onDelete: () => void;
 }) {
   const translateX = useSharedValue(0);
+  const swiping = useSharedValue(false);
 
   const close = () => {
     translateX.set(withSpring(0, { damping: 18, stiffness: 180 }));
@@ -24,6 +25,8 @@ export function SwipeableRoomItem({ room, isCreator, onPress, onDelete }: {
   const pan = Gesture.Pan()
     .activeOffsetX([-10, 10])
     .failOffsetY([-15, 15])
+    .onBegin(() => { swiping.set(false); })
+    .onStart(() => { swiping.set(true); })
     .onUpdate(event => {
       translateX.set(Math.max(-100, Math.min(0, event.translationX)));
     })
@@ -68,7 +71,10 @@ export function SwipeableRoomItem({ room, isCreator, onPress, onDelete }: {
             accessibilityRole="button"
             accessibilityLabel={room.title}
             activeOpacity={0.9}
-            onPress={() => { if (translateX.get() !== 0) close(); else onPress(); }}
+            onPress={() => {
+              if (swiping.get()) return;
+              if (translateX.get() !== 0) close(); else onPress();
+            }}
             className="rounded-2xl bg-surface border border-surfaceLight p-4"
           >
             <View className="flex-row items-center gap-2">
