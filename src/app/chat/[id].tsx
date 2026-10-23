@@ -322,7 +322,7 @@ export default function ChatRoomScreen() {
         initialNumToRender={12}
         maxToRenderPerBatch={10}
         windowSize={7}
-        maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
+        maintainVisibleContentPosition={{ minIndexForVisible: 1, autoscrollToTopThreshold: 100 }}
         onViewableItemsChanged={viewability}
         viewabilityConfig={viewabilityConfig}
         keyExtractor={(item) => item._id}
