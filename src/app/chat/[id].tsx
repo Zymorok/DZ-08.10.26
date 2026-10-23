@@ -162,7 +162,7 @@ export default function ChatRoomScreen() {
       setText("");
       stopTyping();
       Keyboard.dismiss();
-      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
     } catch {
       setError(
         "Не вдалося зберегти повідомлення. Перевірте з’єднання та спробуйте ще раз.",
@@ -190,7 +190,7 @@ export default function ChatRoomScreen() {
       else await sendVideoMessage(args);
       setReplyTarget(null);
       stopTyping();
-      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
     } catch (error) {
       setError(error instanceof ConvexError ? String(error.data) : "Не вдалося надіслати запис. Спробуйте ще раз.");
       throw error;
